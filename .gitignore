@@ -1,0 +1,13 @@
+# Secrets — NEVER commit
+.env
+.env.*
+!.env.example
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Local dev database
+*.db
+test.db

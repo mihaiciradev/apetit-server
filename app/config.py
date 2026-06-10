@@ -1,0 +1,45 @@
+"""
+Central configuration for the APETIT backend.
+
+For the MVP there is no authentication and no Restaurants table yet, so we
+hardcode a single restaurant id. Every row we read/write is scoped to this id,
+which means the day we add real multi-tenancy + auth, we only have to change
+*where this value comes from* (the JWT / subdomain) and not the query logic.
+"""
+
+import os
+
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Where the database lives. Defaults to a local SQLite file for dev.
+# Swap this in .env for the Neon Postgres URL when going to production.
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+
+# MVP: single tenant, hardcoded. Later this comes from auth / subdomain.
+DEFAULT_RESTAURANT_ID = "restaurant-a"
+
+# Bookable time slots offered to guests. Availability is advisory — staff
+# approve/decline each reservation, so this doesn't model real capacity.
+RESERVATION_SLOTS = [
+    "12:00", "13:00", "14:00",
+    "18:00", "19:00", "20:00", "21:00",
+]
+
+# ─────────────────────────── Email (SMTP) ───────────────────────────
+# Master switch. While false, all email is a logged no-op (safe for dev).
+EMAIL_ENABLED = os.getenv("EMAIL_ENABLED", "false").lower() in (
+    "1", "true", "yes", "on",
+)
+SMTP_HOST = os.getenv("SMTP_HOST", "")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+# What guests see as the sender. Defaults to the SMTP user if unset.
+MAIL_FROM = os.getenv("MAIL_FROM", SMTP_USERNAME)
+MAIL_FROM_NAME = os.getenv("MAIL_FROM_NAME", "APETIT")
+
+# Public base URL of the frontend, used to build links inside emails
+# (e.g. the "cancel my booking" link).
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000").rstrip("/")
