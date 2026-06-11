@@ -17,10 +17,11 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db import get_db
-from app.models import MenuItem, Order, Reservation, Table, Voucher
+from app.models import AuditLog, MenuItem, Order, Reservation, Table, Voucher
 from app.notifications import send_voucher_email
 from app.schemas import (
     AnalyticsOut,
+    AuditLogOut,
     MenuItemCreate,
     MenuItemOut,
     MenuItemUpdate,
@@ -272,6 +273,38 @@ def create_voucher(
             voucher.code,
         )
     return voucher
+
+
+@router.get("/logs", response_model=list[AuditLogOut])
+def audit_logs(
+    start: date_type | None = Query(None, description="Inclusive start date YYYY-MM-DD"),
+    end: date_type | None = Query(None, description="Inclusive end date YYYY-MM-DD"),
+    source: str | None = Query(None, description="Filter by screen, e.g. 'admin'"),
+    method: str | None = Query(None, description="POST | PUT | PATCH | DELETE"),
+    q: str | None = Query(None, description="Search in the path"),
+    limit: int | None = Query(100, ge=1, le=1000, description="Page size"),
+    offset: int = Query(0, ge=0, description="Page offset"),
+    db: Session = Depends(get_db),
+    rid: str = Depends(current_restaurant_id),
+):
+    """Audit trail of mutating actions, newest first. Filter by date range,
+    source screen, method, or path search. Defaults to the latest 100."""
+    lo, hi = _created_at_bounds(start, end)
+    stmt = select(AuditLog).where(AuditLog.restaurant_id == rid)
+    if lo is not None:
+        stmt = stmt.where(AuditLog.created_at >= lo)
+    if hi is not None:
+        stmt = stmt.where(AuditLog.created_at < hi)
+    if source:
+        stmt = stmt.where(AuditLog.source == source)
+    if method:
+        stmt = stmt.where(AuditLog.method == method.upper())
+    if q:
+        stmt = stmt.where(AuditLog.path.ilike(f"%{q.strip()}%"))
+    stmt = stmt.order_by(AuditLog.created_at.desc()).offset(offset)
+    if limit is not None:
+        stmt = stmt.limit(limit)
+    return db.scalars(stmt).all()
 
 
 @router.get("/analytics", response_model=AnalyticsOut)

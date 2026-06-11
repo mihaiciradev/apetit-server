@@ -60,6 +60,7 @@ def create_order(
     """Create a new order from a list of (menu_item_id, quantity)."""
     # 1. Resolve dine-in vs takeaway and the (optional) table.
     table_id = None
+    table = None
     if payload.table_id:
         table = db.get(Table, payload.table_id)
         if table is None or table.restaurant_id != rid:
@@ -123,6 +124,11 @@ def create_order(
             )
         )
     order.total_price = total
+
+    # A dine-in order means the table is in use — mark it occupied.
+    if table_id is not None and table is not None and table.status != "occupied":
+        table.status = "occupied"
+        table.occupied_at = datetime.now(timezone.utc)
 
     db.add(order)
     db.commit()

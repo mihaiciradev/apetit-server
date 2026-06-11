@@ -123,6 +123,10 @@ def set_table_status(
     if table is None or table.restaurant_id != rid:
         raise HTTPException(status_code=404, detail="Table not found")
     table.status = payload.status
+    # Track when occupancy started; clear it when the table is freed.
+    table.occupied_at = (
+        datetime.now(timezone.utc) if payload.status == "occupied" else None
+    )
     db.commit()
     db.refresh(table)
     return table

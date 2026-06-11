@@ -70,6 +70,7 @@ class TableOut(BaseModel):
     id: str
     number: int
     status: str = "free"   # free | occupied
+    occupied_at: datetime | None = None
 
 
 class TableCreate(BaseModel):
@@ -269,6 +270,17 @@ class AnalyticsOut(BaseModel):
     orders_by_hour: dict[str, int] = {}
     revenue_by_day: dict[str, Decimal] = {}   # "YYYY-MM-DD" -> revenue
     top_items: list[TopItem] = []
+
+
+class AuditLogOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    source: str          # screen that triggered it
+    method: str          # POST | PUT | PATCH | DELETE
+    path: str            # what was acted on
+    status_code: int
+    created_at: datetime
 
 
 class StaffSummaryOut(BaseModel):

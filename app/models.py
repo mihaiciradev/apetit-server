@@ -81,9 +81,12 @@ class Table(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     restaurant_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     number: Mapped[int] = mapped_column(Integer, nullable=False)
-    # free | occupied — set manually by staff (e.g. a walk-in that didn't
-    # order through the app). Not auto-linked to orders.
+    # free | occupied. Set automatically when an order is placed at the table,
+    # or manually by staff (e.g. a walk-in that didn't order via the app).
     status: Mapped[str] = mapped_column(String, default="free", index=True)
+    # When the table became occupied (cleared when freed). Lets the UI show
+    # "occupied for 25 min".
+    occupied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
 
 
@@ -213,6 +216,25 @@ class Voucher(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     redeemed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class AuditLog(Base):
+    """Append-only record of every mutating action, for traceability.
+
+    Written by middleware on each successful POST/PUT/PATCH/DELETE:
+      - source : which screen triggered it (from the X-Client-Screen header)
+      - method + path : what was done (e.g. PATCH /api/kitchen/orders/{id}/status)
+      - restaurant_id : which tenant
+    """
+    __tablename__ = "audit_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    restaurant_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
+    source: Mapped[str] = mapped_column(String, default="unknown", index=True)
+    method: Mapped[str] = mapped_column(String, nullable=False)
+    path: Mapped[str] = mapped_column(String, nullable=False)
+    status_code: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_now, index=True)
 
 
 class ServiceRequest(Base):

@@ -10,13 +10,15 @@ Run locally:   uvicorn app.main:app --reload
 Interactive docs:   http://127.0.0.1:8000/docs
 """
 
+import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import config
-from app.db import Base, engine
+from app.db import Base, SessionLocal, engine
+from app.models import AuditLog
 from app.routers import (
     admin,
     kitchen,
@@ -26,6 +28,11 @@ from app.routers import (
     staff,
     tables,
 )
+
+audit_logger = logging.getLogger("apetit.audit")
+
+# Only state-changing verbs are worth auditing (reads are noise).
+_AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
 @asynccontextmanager
@@ -50,8 +57,40 @@ app.add_middleware(
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],   # incl. PATCH / DELETE
-    allow_headers=["*"],
+    # Explicit headers + the custom screen header the FE sends for audit logs.
+    allow_headers=["*", "X-Client-Screen"],
 )
+
+
+@app.middleware("http")
+async def audit_log_middleware(request: Request, call_next):
+    """Record every successful mutating request to the audit log.
+
+    The FE should send an `X-Client-Screen` header (e.g. "admin", "kitchen",
+    "customer-menu", "table") so each entry says where it came from. Failures
+    here never affect the response — logging is best-effort.
+    """
+    response = await call_next(request)
+    if request.method in _AUDIT_METHODS and response.status_code < 400:
+        try:
+            db = SessionLocal()
+            try:
+                db.add(
+                    AuditLog(
+                        restaurant_id=config.DEFAULT_RESTAURANT_ID,
+                        source=request.headers.get("x-client-screen", "unknown"),
+                        method=request.method,
+                        path=request.url.path,
+                        status_code=response.status_code,
+                    )
+                )
+                db.commit()
+            finally:
+                db.close()
+        except Exception:  # noqa: BLE001 — never break the request over a log
+            audit_logger.exception("audit log write failed")
+    return response
+
 
 # Feature routers.
 app.include_router(menu.router)
