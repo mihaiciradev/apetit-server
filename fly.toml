@@ -1,20 +1,23 @@
-app = "webbinghub-apetit-server"
-primary_region = "fra"
+# fly.toml app configuration file generated for webbinghub-apetit-server on 2026-06-11T15:50:18Z
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'webbinghub-apetit-server'
+primary_region = 'ams'
 
 [build]
 
-# Runs once per deploy, before the new version goes live. The seed script is
-# idempotent (it skips if the menu already has items), so it's safe to re-run.
 [deploy]
-  release_command = "python -m app.seed"
+  release_command = 'python -m app.seed'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = true
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "256mb"
+  size = 'shared-cpu-1x'
+  memory = '256mb'
