@@ -1,10 +1,10 @@
-# fly.toml app configuration file generated for webbinghub-apetit-server on 2026-06-11T15:50:18Z
+# fly.toml app configuration file generated for webbinghub-apetit-server on 2026-06-11T16:20:44Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
 app = 'webbinghub-apetit-server'
-primary_region = 'ams'
+primary_region = 'fra'
 
 [build]
 
