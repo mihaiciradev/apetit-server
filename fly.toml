@@ -1,5 +1,5 @@
-app = "apetit-server"
-primary_region = "ams"
+app = "webbinghub-apetit-server"
+primary_region = "fra"
 
 [build]
 

@@ -1,0 +1,31 @@
+# Render Blueprint — deploys the APETIT backend as a Docker web service.
+# Create via Render dashboard → "New" → "Blueprint" → pick this repo.
+services:
+  - type: web
+    name: webbinghub-apetit-server
+    runtime: docker
+    region: frankfurt          # near the Neon DB (eu-central-1)
+    plan: free                 # change to "starter" ($7/mo) to avoid cold starts
+    healthCheckPath: /health
+    autoDeploy: true           # redeploy on push to the connected branch
+    envVars:
+      # Secrets — set these in the Render dashboard (sync:false = not in git).
+      - key: DATABASE_URL
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      # Non-secret config.
+      - key: EMAIL_ENABLED
+        value: "true"
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USERNAME
+        value: support@webbinghub.io
+      - key: MAIL_FROM
+        value: support@webbinghub.io
+      - key: MAIL_FROM_NAME
+        value: APETIT
