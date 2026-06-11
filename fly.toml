@@ -1,0 +1,20 @@
+app = "apetit-server"
+primary_region = "ams"
+
+[build]
+
+# Runs once per deploy, before the new version goes live. The seed script is
+# idempotent (it skips if the menu already has items), so it's safe to re-run.
+[deploy]
+  release_command = "python -m app.seed"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

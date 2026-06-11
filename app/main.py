@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import config
 from app.db import Base, engine
 from app.routers import (
     admin,
@@ -42,10 +43,10 @@ app = FastAPI(title="APETIT Backend", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     # NOTE: browsers reject `allow_origins=["*"]` together with
-    # allow_credentials=True. Use a regex for any localhost port in dev
-    # (3000, 3043, whatever Next picks). Add your real Vercel domains to
-    # `allow_origins` before production.
-    allow_origins=[],  # production domains go here later
+    # allow_credentials=True. The production frontend domain comes from
+    # FRONTEND_URL (set it as a Fly env var); any localhost port is allowed
+    # in dev via the regex.
+    allow_origins=[config.FRONTEND_URL] if config.FRONTEND_URL else [],
     allow_origin_regex=r"http://(localhost|127\.0\.0\.1):\d+",
     allow_credentials=True,
     allow_methods=["*"],   # incl. PATCH / DELETE

@@ -14,8 +14,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Where the database lives. Defaults to a local SQLite file for dev.
-# Swap this in .env for the Neon Postgres URL when going to production.
+# In production set DATABASE_URL to your Postgres connection string.
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+
+# Fly Managed Postgres and Neon often hand out a "postgres://" URL, but
+# SQLAlchemy 2.0 requires the "postgresql://" scheme. Normalise it so either
+# works without thinking about it.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 # MVP: single tenant, hardcoded. Later this comes from auth / subdomain.
 DEFAULT_RESTAURANT_ID = "restaurant-a"

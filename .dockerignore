@@ -1,0 +1,9 @@
+# Don't ship dev cruft / secrets into the image
+venv/
+__pycache__/
+*.pyc
+.env
+.env.*
+*.db
+.git/
+.gitignore
