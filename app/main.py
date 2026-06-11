@@ -116,12 +116,16 @@ async def audit_log_middleware(request: Request, call_next):
     if request.method in _AUDIT_METHODS and response.status_code < 400:
         try:
             source = request.headers.get("x-client-screen", "unknown")
-            # Route template (e.g. "/api/kitchen/orders/{order_id}/status") +
-            # the actual path params, so we can write a readable line.
-            route = request.scope.get("route")
-            template = getattr(route, "path", request.url.path)
-            params = dict(request.path_params or {})
-            action = _describe_action(request.method, template, params, source)
+            # Prefer a rich description the handler set (with entity names);
+            # otherwise fall back to a generic route-based phrase.
+            detail = getattr(request.state, "audit_detail", None)
+            if detail:
+                action = f"{source}: {detail}"
+            else:
+                route = request.scope.get("route")
+                template = getattr(route, "path", request.url.path)
+                params = dict(request.path_params or {})
+                action = _describe_action(request.method, template, params, source)
 
             db = SessionLocal()
             try:
