@@ -46,7 +46,7 @@ def send_email(
         msg.add_alternative(html_body, subtype="html")
 
     try:
-        print(config.SMTP_HOST, config.SMTP_PORT)
+        logger.info(config.SMTP_HOST, config.SMTP_PORT)
         with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=20) as server:
             server.starttls(context=ssl.create_default_context())
             server.login(config.SMTP_USERNAME, config.SMTP_PASSWORD)
