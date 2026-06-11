@@ -71,6 +71,9 @@ class TableOut(BaseModel):
     number: int
     status: str = "free"   # free | occupied
     occupied_at: datetime | None = None
+    occupied_reason: str | None = None      # scan | order | manual
+    review_due: bool = False                # waiter should confirm if free
+    review_due_at: datetime | None = None   # when the prompt becomes due
 
 
 class TableCreate(BaseModel):
@@ -277,8 +280,9 @@ class AuditLogOut(BaseModel):
 
     id: str
     source: str          # screen that triggered it
+    action: str          # human-readable, e.g. "kitchen: updated order 1a2b3c4d"
     method: str          # POST | PUT | PATCH | DELETE
-    path: str            # what was acted on
+    path: str            # raw path (kept for filtering/debugging)
     status_code: int
     created_at: datetime
 

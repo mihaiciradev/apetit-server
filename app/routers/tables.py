@@ -10,8 +10,11 @@ NOT the table number. So:
   UUID, and the frontend drops it once the order is ready/served.)
 
     GET  /api/tables/{table_id}             -> resolve a table (number)
+    POST /api/tables/{table_id}/checkin     -> mark occupied on scan (10-min window)
     POST /api/tables/{table_id}/call-waiter -> raise a "come over" signal
 """
+
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -37,8 +40,29 @@ def resolve_table(
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
-    """Resolve a scanned QR to a table (so the UI can show 'Table 4')."""
+    """Resolve a scanned QR to a table (so the UI can show 'Table 4').
+    This is a pure read — it does NOT change occupancy. Call /checkin for that."""
     return _get_table_or_404(db, table_id, rid)
+
+
+@router.post("/{table_id}/checkin", response_model=TableOut)
+def checkin_table(
+    table_id: str,
+    db: Session = Depends(get_db),
+    rid: str = Depends(current_restaurant_id),
+):
+    """Mark a table occupied because a guest scanned its QR (10-min review
+    window). No-op if it's already occupied — we won't downgrade an existing
+    'order' occupancy (45 min) back to a 'scan' one. The FE calls this when the
+    table menu page loads."""
+    table = _get_table_or_404(db, table_id, rid)
+    if table.status != "occupied":
+        table.status = "occupied"
+        table.occupied_at = datetime.now(timezone.utc)
+        table.occupied_reason = "scan"
+        db.commit()
+        db.refresh(table)
+    return table
 
 
 @router.post("/{table_id}/call-waiter", response_model=ServiceRequestOut, status_code=201)

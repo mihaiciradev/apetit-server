@@ -125,10 +125,12 @@ def create_order(
         )
     order.total_price = total
 
-    # A dine-in order means the table is in use — mark it occupied.
+    # A dine-in order means the table is in use — mark it occupied (45-min
+    # review window). Don't reset a table already occupied from a scan/order.
     if table_id is not None and table is not None and table.status != "occupied":
         table.status = "occupied"
         table.occupied_at = datetime.now(timezone.utc)
+        table.occupied_reason = "order"
 
     db.add(order)
     db.commit()

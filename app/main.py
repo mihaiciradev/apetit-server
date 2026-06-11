@@ -35,6 +35,48 @@ audit_logger = logging.getLogger("apetit.audit")
 _AUDIT_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
 
 
+def _short(v) -> str:
+    return str(v)[:8]
+
+
+# (method, route_template) -> phrase builder. Produces human-readable log text.
+_ACTION_PHRASES = {
+    ("POST", "/api/orders"): lambda p: "placed an order",
+    ("POST", "/api/orders/{order_id}/request-bill"):
+        lambda p: f"requested the bill for order {_short(p.get('order_id'))}",
+    ("POST", "/api/tables/{table_id}/checkin"): lambda p: "checked in at a table",
+    ("POST", "/api/tables/{table_id}/call-waiter"): lambda p: "called the waiter",
+    ("POST", "/api/reservations"): lambda p: "requested a reservation",
+    ("POST", "/api/reservations/{reservation_id}/cancel"):
+        lambda p: f"cancelled reservation {_short(p.get('reservation_id'))}",
+    ("PATCH", "/api/kitchen/orders/{order_id}/status"):
+        lambda p: f"updated order {_short(p.get('order_id'))} status",
+    ("PATCH", "/api/staff/service-requests/{request_id}/resolve"):
+        lambda p: f"resolved service request {_short(p.get('request_id'))}",
+    ("PATCH", "/api/staff/reservations/{reservation_id}/status"):
+        lambda p: f"set reservation {_short(p.get('reservation_id'))} status",
+    ("PATCH", "/api/staff/reservations/{reservation_id}/table"):
+        lambda p: f"assigned a table to reservation {_short(p.get('reservation_id'))}",
+    ("PATCH", "/api/staff/tables/{table_id}/status"):
+        lambda p: f"updated table {_short(p.get('table_id'))} status",
+    ("POST", "/api/staff/vouchers/redeem"): lambda p: "redeemed a voucher",
+    ("POST", "/api/admin/menu"): lambda p: "added a menu item",
+    ("PUT", "/api/admin/menu/{item_id}"):
+        lambda p: f"edited menu item {_short(p.get('item_id'))}",
+    ("DELETE", "/api/admin/menu/{item_id}"):
+        lambda p: f"deleted menu item {_short(p.get('item_id'))}",
+    ("POST", "/api/admin/tables"): lambda p: "created a table",
+    ("POST", "/api/admin/vouchers"): lambda p: "created a voucher",
+}
+
+
+def _describe_action(method: str, template: str, params: dict, source: str) -> str:
+    """Build a human line like 'kitchen: updated order 1a2b3c4d status'."""
+    builder = _ACTION_PHRASES.get((method, template))
+    phrase = builder(params) if builder else f"{method} {template}"
+    return f"{source}: {phrase}"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # On startup: create any tables that don't exist yet.
@@ -73,12 +115,21 @@ async def audit_log_middleware(request: Request, call_next):
     response = await call_next(request)
     if request.method in _AUDIT_METHODS and response.status_code < 400:
         try:
+            source = request.headers.get("x-client-screen", "unknown")
+            # Route template (e.g. "/api/kitchen/orders/{order_id}/status") +
+            # the actual path params, so we can write a readable line.
+            route = request.scope.get("route")
+            template = getattr(route, "path", request.url.path)
+            params = dict(request.path_params or {})
+            action = _describe_action(request.method, template, params, source)
+
             db = SessionLocal()
             try:
                 db.add(
                     AuditLog(
                         restaurant_id=config.DEFAULT_RESTAURANT_ID,
-                        source=request.headers.get("x-client-screen", "unknown"),
+                        source=source,
+                        action=action,
                         method=request.method,
                         path=request.url.path,
                         status_code=response.status_code,

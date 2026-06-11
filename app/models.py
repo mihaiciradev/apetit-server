@@ -22,7 +22,7 @@ has no RLS, so app-level scoping is the source of truth for now.
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from datetime import date as date_type
 
@@ -87,7 +87,27 @@ class Table(Base):
     # When the table became occupied (cleared when freed). Lets the UI show
     # "occupied for 25 min".
     occupied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Why it's occupied: scan | order | manual — drives the review window.
+    occupied_reason: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
+
+    @property
+    def review_due_at(self) -> datetime | None:
+        """When the waiter should be prompted to confirm this table is free.
+        None if the table isn't occupied."""
+        from app.config import TABLE_REVIEW_MINUTES
+        if self.status != "occupied" or self.occupied_at is None:
+            return None
+        minutes = TABLE_REVIEW_MINUTES.get(self.occupied_reason or "manual", 90)
+        return self.occupied_at + timedelta(minutes=minutes)
+
+    @property
+    def review_due(self) -> bool:
+        """True once the occupancy window has elapsed — time to ask the waiter
+        'is this table free now?'. We never free it automatically."""
+        due = self.review_due_at
+        # occupied_at is stored as naive UTC, so compare with naive utcnow().
+        return bool(due is not None and datetime.utcnow() >= due)
 
 
 class Order(Base):
@@ -231,6 +251,8 @@ class AuditLog(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     restaurant_id: Mapped[str] = mapped_column(String, index=True, nullable=False)
     source: Mapped[str] = mapped_column(String, default="unknown", index=True)
+    # Human-readable line for the FE, e.g. "kitchen: updated order 1a2b3c4d".
+    action: Mapped[str] = mapped_column(String, default="", nullable=False)
     method: Mapped[str] = mapped_column(String, nullable=False)
     path: Mapped[str] = mapped_column(String, nullable=False)
     status_code: Mapped[int] = mapped_column(Integer, nullable=False)

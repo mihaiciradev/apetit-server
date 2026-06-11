@@ -124,9 +124,12 @@ def set_table_status(
         raise HTTPException(status_code=404, detail="Table not found")
     table.status = payload.status
     # Track when occupancy started; clear it when the table is freed.
-    table.occupied_at = (
-        datetime.now(timezone.utc) if payload.status == "occupied" else None
-    )
+    if payload.status == "occupied":
+        table.occupied_at = datetime.now(timezone.utc)
+        table.occupied_reason = "manual"
+    else:
+        table.occupied_at = None
+        table.occupied_reason = None
     db.commit()
     db.refresh(table)
     return table

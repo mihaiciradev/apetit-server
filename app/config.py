@@ -33,6 +33,15 @@ RESERVATION_SLOTS = [
     "18:00", "19:00", "20:00", "21:00",
 ]
 
+# How long (minutes) a table stays "occupied" before the waiter is PROMPTED to
+# confirm whether it's free. We never auto-free silently — we just surface a
+# review prompt after this window, based on WHY it became occupied.
+TABLE_REVIEW_MINUTES = {
+    "scan": 10,     # someone scanned the QR but may have just been browsing
+    "order": 45,    # they actually ordered — give them a full sitting
+    "manual": 90,   # staff set it; longest leash before nudging
+}
+
 # ─────────────────────────── Email (SMTP) ───────────────────────────
 # Master switch. While false, all email is a logged no-op (safe for dev).
 EMAIL_ENABLED = os.getenv("EMAIL_ENABLED", "false").lower() in (
