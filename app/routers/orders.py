@@ -19,7 +19,7 @@ Rules:
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -54,6 +54,7 @@ def _next_daily_number(db: Session, restaurant_id: str) -> int:
 @router.post("", response_model=OrderOut, status_code=201)
 def create_order(
     payload: OrderCreate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -135,6 +136,8 @@ def create_order(
     db.add(order)
     db.commit()
     db.refresh(order)
+    where = f"table {table.number}" if table is not None else order.order_type
+    request.state.audit_detail = f"placed order #{order.daily_number} ({where})"
     return order
 
 
@@ -154,6 +157,7 @@ def get_order(
 @router.post("/{order_id}/request-bill", response_model=OrderOut)
 def request_bill(
     order_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -183,4 +187,5 @@ def request_bill(
     )
     db.commit()
     db.refresh(order)
+    request.state.audit_detail = f"requested the bill for order #{order.daily_number}"
     return order

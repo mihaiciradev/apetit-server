@@ -8,7 +8,7 @@ service requests (call-waiter + bill).
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -80,6 +80,7 @@ def open_requests(
 @router.patch("/service-requests/{request_id}/resolve", response_model=ServiceRequestOut)
 def resolve_request(
     request_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -91,6 +92,9 @@ def resolve_request(
     req.resolved_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(req)
+    label = "bill" if req.type == "bill" else "call-waiter"
+    where = f" for table {req.table_number}" if req.table_number else ""
+    request.state.audit_detail = f"resolved {label} request{where}"
     return req
 
 
@@ -114,6 +118,7 @@ def staff_tables(
 def set_table_status(
     table_id: str,
     payload: TableStatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -132,6 +137,8 @@ def set_table_status(
         table.occupied_reason = None
     db.commit()
     db.refresh(table)
+    verb = "freed" if payload.status == "free" else "marked occupied"
+    request.state.audit_detail = f"{verb} table {table.number}"
     return table
 
 
@@ -159,6 +166,7 @@ def staff_reservations(
 def set_reservation_status(
     reservation_id: str,
     payload: ReservationStatusUpdate,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
@@ -176,6 +184,10 @@ def set_reservation_status(
     r.status = payload.status
     db.commit()
     db.refresh(r)
+    verb = "confirmed" if payload.status == "confirmed" else "declined"
+    request.state.audit_detail = (
+        f"{verb} reservation for {r.customer_name} ({r.date} {r.time})"
+    )
 
     if payload.status == "confirmed":
         background_tasks.add_task(
@@ -194,6 +206,7 @@ def set_reservation_status(
 def assign_reservation_table(
     reservation_id: str,
     payload: ReservationTableAssign,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -203,11 +216,21 @@ def assign_reservation_table(
     if r is None or r.restaurant_id != rid:
         raise HTTPException(status_code=404, detail="Reservation not found")
 
+    table_number = None
     if payload.table_id is not None:
         _validate_table(db, payload.table_id, rid)
+        table_number = db.get(Table, payload.table_id).number
     r.table_id = payload.table_id  # may be None to clear
     db.commit()
     db.refresh(r)
+    if table_number is not None:
+        request.state.audit_detail = (
+            f"assigned table {table_number} to {r.customer_name}'s reservation"
+        )
+    else:
+        request.state.audit_detail = (
+            f"cleared the table on {r.customer_name}'s reservation"
+        )
     return r
 
 
@@ -248,6 +271,7 @@ def lookup_voucher(
 @router.post("/vouchers/redeem", response_model=VoucherOut)
 def redeem_voucher(
     payload: VoucherRedeem,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -267,4 +291,5 @@ def redeem_voucher(
     v.redeemed_at = datetime.now(timezone.utc)
     db.commit()
     db.refresh(v)
+    request.state.audit_detail = f"redeemed voucher {v.code} ({v.percentage}%)"
     return v

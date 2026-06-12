@@ -15,7 +15,7 @@ Marking "served" stamps completed_at; moving back off "served" clears it.
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -48,6 +48,7 @@ def kitchen_orders(
 def update_status(
     order_id: str,
     payload: OrderStatusUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -67,4 +68,7 @@ def update_status(
 
     db.commit()
     db.refresh(order)
+    request.state.audit_detail = (
+        f"marked order #{order.daily_number} {order.status}"
+    )
     return order

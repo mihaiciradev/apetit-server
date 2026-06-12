@@ -74,6 +74,7 @@ def _created_at_bounds(
 @router.post("/menu", response_model=MenuItemOut, status_code=201)
 def create_menu_item(
     payload: MenuItemCreate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -91,6 +92,7 @@ def create_menu_item(
     db.add(item)
     db.commit()
     db.refresh(item)
+    request.state.audit_detail = f"added menu item '{item.name}'"
     return item
 
 
@@ -98,6 +100,7 @@ def create_menu_item(
 def update_menu_item(
     item_id: str,
     payload: MenuItemUpdate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -111,12 +114,14 @@ def update_menu_item(
 
     db.commit()
     db.refresh(item)
+    request.state.audit_detail = f"edited menu item '{item.name}'"
     return item
 
 
 @router.delete("/menu/{item_id}", status_code=204)
 def delete_menu_item(
     item_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -125,6 +130,7 @@ def delete_menu_item(
     item = db.get(MenuItem, item_id)
     if item is None or item.restaurant_id != rid:
         raise HTTPException(status_code=404, detail="Menu item not found")
+    request.state.audit_detail = f"deleted menu item '{item.name}'"
     db.delete(item)
     db.commit()
 
@@ -148,6 +154,7 @@ def list_tables(
 @router.post("/tables", response_model=TableOut, status_code=201)
 def create_table(
     payload: TableCreate,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -156,6 +163,7 @@ def create_table(
     db.add(table)
     db.commit()
     db.refresh(table)
+    request.state.audit_detail = f"created table {table.number}"
     return table
 
 
@@ -245,6 +253,7 @@ def list_vouchers(
 @router.post("/vouchers", response_model=VoucherOut, status_code=201)
 def create_voucher(
     payload: VoucherCreate,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
@@ -263,6 +272,9 @@ def create_voucher(
     db.add(voucher)
     db.commit()
     db.refresh(voucher)
+    request.state.audit_detail = (
+        f"created {voucher.percentage}% voucher {voucher.code}"
+    )
 
     # Email it to the guest if an address was given.
     if voucher.customer_email:

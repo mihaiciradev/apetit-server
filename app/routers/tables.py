@@ -16,7 +16,7 @@ NOT the table number. So:
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -48,6 +48,7 @@ def resolve_table(
 @router.post("/{table_id}/checkin", response_model=TableOut)
 def checkin_table(
     table_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -62,12 +63,14 @@ def checkin_table(
         table.occupied_reason = "scan"
         db.commit()
         db.refresh(table)
+    request.state.audit_detail = f"checked in at table {table.number}"
     return table
 
 
 @router.post("/{table_id}/call-waiter", response_model=ServiceRequestOut, status_code=201)
 def call_waiter(
     table_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -83,4 +86,5 @@ def call_waiter(
     db.add(req)
     db.commit()
     db.refresh(req)
+    request.state.audit_detail = f"called the waiter to table {table.number}"
     return req

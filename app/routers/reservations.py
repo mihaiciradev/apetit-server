@@ -14,7 +14,7 @@ still approve or decline every request, so we don't model real capacity.
 
 from datetime import date as date_type
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
 from app.config import RESERVATION_SLOTS
@@ -51,6 +51,7 @@ def availability(
 @router.post("", response_model=ReservationOut, status_code=201)
 def create_reservation(
     payload: ReservationCreate,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
@@ -78,6 +79,10 @@ def create_reservation(
     db.add(reservation)
     db.commit()
     db.refresh(reservation)
+    request.state.audit_detail = (
+        f"requested a reservation for {reservation.customer_name} "
+        f"({reservation.date} {reservation.time}, party of {reservation.party_size})"
+    )
 
     # Send the "we received your request" email after the response, with plain
     # values (the session is closed by the time this runs).
@@ -109,6 +114,7 @@ def get_reservation(
 @router.post("/{reservation_id}/cancel", response_model=ReservationOut)
 def cancel_reservation(
     reservation_id: str,
+    request: Request,
     db: Session = Depends(get_db),
     rid: str = Depends(current_restaurant_id),
 ):
@@ -125,4 +131,7 @@ def cancel_reservation(
     r.status = "cancelled"
     db.commit()
     db.refresh(r)
+    request.state.audit_detail = (
+        f"cancelled reservation for {r.customer_name} ({r.date} {r.time})"
+    )
     return r
