@@ -49,6 +49,11 @@ EMAIL_ENABLED = os.getenv("EMAIL_ENABLED", "false").lower() in (
 )
 SMTP_HOST = os.getenv("SMTP_HOST", "")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+# Implicit SSL (smtplib.SMTP_SSL) vs STARTTLS. Defaults to True on the
+# standard SSL port 465, False otherwise — overridable via SMTP_USE_SSL.
+SMTP_USE_SSL = os.getenv("SMTP_USE_SSL", "true" if SMTP_PORT == 465 else "false").lower() in (
+    "1", "true", "yes", "on",
+)
 SMTP_USERNAME = os.getenv("SMTP_USERNAME", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 # What guests see as the sender. Defaults to the SMTP user if unset.
